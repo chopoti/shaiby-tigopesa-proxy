@@ -2,6 +2,12 @@ const express = require("express");
 const axios = require("axios");
 const qs = require("qs");
 
+const https = require("https");
+
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
+
 const app = express();
 app.use(express.json());
 
@@ -25,6 +31,7 @@ async function getAccessToken() {
         "Cache-Control": "no-cache",
       },
       timeout: 15000,
+       httpsAgent,
     }
   );
 
@@ -53,6 +60,7 @@ app.post("/relay/push-billpay", async (req, res) => {
           "Cache-Control": "no-cache",
         },
         timeout: 15000,
+         httpsAgent,
       }
     );
 
