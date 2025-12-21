@@ -1,0 +1,12 @@
+[0;1;31m×[0m vpn-ping.service - VPN Keep-Alive Ping
+     Loaded: loaded (]8;;file://utunnelvpn10114onubuntu2404-s-2vcpu-4gb-amd-sfo3-01/etc/systemd/system/vpn-ping.service/etc/systemd/system/vpn-ping.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Mon 2025-12-15 18:42:37 UTC; 14s ago
+   Duration: 3ms
+    Process: 884697 ExecStart=/usr/bin/ping 41.222.176.233 -i 10 [0;1;31m(code=exited, status=217/USER)[0m
+   Main PID: 884697 (code=exited, status=217/USER)
+        CPU: 3ms
+
+Dec 15 18:42:37 utunnelvpn10114onubuntu2404-s-2vcpu-4gb-amd-sfo3-01 systemd[1]: vpn-ping.service: Scheduled restart job, restart counter is at 5.
+Dec 15 18:42:37 utunnelvpn10114onubuntu2404-s-2vcpu-4gb-amd-sfo3-01 systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mvpn-ping.service: Start request repeated too quickly.[0m
+Dec 15 18:42:37 utunnelvpn10114onubuntu2404-s-2vcpu-4gb-amd-sfo3-01 systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mvpn-ping.service: Failed with result 'exit-code'.[0m
+Dec 15 18:42:37 utunnelvpn10114onubuntu2404-s-2vcpu-4gb-amd-sfo3-01 systemd[1]: [0;1;31m[0;1;39m[0;1;31mFailed to start vpn-ping.service - VPN Keep-Alive Ping.[0m
