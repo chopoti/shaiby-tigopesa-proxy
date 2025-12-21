@@ -15,9 +15,35 @@ app.use(express.json());
 const TIGO_BASE_URL = "https://sal-accessgwr1.tigo.co.tz:8443";
 const USERNAME = "ShabibyTransporterLtd";
 const PASSWORD = "saRBJCe";
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// ===== TOKEN CACHE =====
+let cachedToken = null;
+let tokenExpiryTime = null;
+
+function isTokenValid() {
+  if (!cachedToken || !tokenExpiryTime) {
+    return false;
+  }
+  const now = Date.now();
+  const isValid = now < tokenExpiryTime;
+  if (!isValid) {
+    console.log("Token expired. Current time:", new Date(now).toISOString(), "Expiry time:", new Date(tokenExpiryTime).toISOString());
+    cachedToken = null;
+    tokenExpiryTime = null;
+  }
+  return isValid;
+}
 
 // ===== TOKEN REQUEST =====
 async function getAccessToken() {
+  // Return cached token if still valid
+  if (isTokenValid()) {
+    console.log("Using cached token. Expires at:", new Date(tokenExpiryTime).toISOString());
+    return cachedToken;
+  }
+
+  console.log("Requesting new token from Tigo...");
   const response = await axios.post(
     `${TIGO_BASE_URL}/ShabibyTranspoter2DMGetToken`,
     qs.stringify({
@@ -35,13 +61,18 @@ async function getAccessToken() {
     }
   );
 
-  
   console.log("Token Response :", {
-  message: response.message,
-  status: response?.status,
-  data: response?.data,
-});
-  return response.data.access_token;
+    message: response?.message,
+    status: response?.status,
+    data: response?.data,
+  });
+
+  // Cache the token
+  cachedToken = response.data.access_token;
+  tokenExpiryTime = Date.now() + TOKEN_EXPIRY_MS;
+  console.log("Token cached. Expires at:", new Date(tokenExpiryTime).toISOString());
+
+  return cachedToken;
 }
 
 // ===== RELAY ENDPOINT =====
@@ -71,6 +102,11 @@ app.post("/relay/push-billpay", async (req, res) => {
     );
 
     // 3. Return response to caller
+      console.log("PushBillPay Response :", {
+  message: pushResponse?.message,
+  status: pushResponse?.status,
+  data: pushResponse?.data,
+});
     res.status(200).json(pushResponse.data);
   } catch (error) {
     console.error("Relay error:", error.response?.data || error.message);
