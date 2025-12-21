@@ -12,14 +12,14 @@ const app = express();
 app.use(express.json());
 
 // ===== CONFIG =====
-const TIGO_BASE_URL = "https://sal-accessgwr1.tigo.co.tz:8443/ShabibyTranspoter2DMPushBillPay";
+const TIGO_BASE_URL = "https://sal-accessgwr1.tigo.co.tz:8443";
 const USERNAME = "ShabibyTransporterLtd";
 const PASSWORD = "saRBJCe";
 
 // ===== TOKEN REQUEST =====
 async function getAccessToken() {
   const response = await axios.post(
-    `${TIGO_BASE_URL}/ShabibyTransporterLtd2DM-GetToken`,
+    `${TIGO_BASE_URL}/ShabibyTranspoter2DMGetToken`,
     qs.stringify({
       username: USERNAME,
       password: PASSWORD,
@@ -49,7 +49,7 @@ app.post("/relay/push-billpay", async (req, res) => {
 
     // 2. Call PushBillpay
     const pushResponse = await axios.post(
-      `${TIGO_BASE_URL}/ShabibyTransporterLtd2DM-PushBillpay`,
+      `${TIGO_BASE_URL}/ShabibyTranspoter2DMPushBillPay`,
       req.body,
       {
         headers: {
