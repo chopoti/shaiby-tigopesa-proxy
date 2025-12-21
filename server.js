@@ -35,7 +35,7 @@ async function getAccessToken() {
     }
   );
 
-  console.log("Access Token ", JSON.stringfy(response))
+  console.log("Access Token ", JSON.stringify(response))
   return response.data.access_token;
 }
 
