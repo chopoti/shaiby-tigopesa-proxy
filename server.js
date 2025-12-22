@@ -210,6 +210,7 @@ async function forwardCallbackToInternalService(callbackData) {
           "Content-Type": "application/json",
         },
         timeout: config.INTERNAL_SERVICE_TIMEOUT,
+        httpsAgent,
       }
     );
 
