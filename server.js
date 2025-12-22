@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const qs = require("qs");
+const ping = require("ping");
 
 const https = require("https");
 
@@ -83,6 +84,86 @@ if (!validateConfig()) {
 }
 
 logConfiguration();
+
+// ===== HEALTH CHECK =====
+let tigoHealthStatus = {
+  isHealthy: false,
+  lastChecked: null,
+  lastError: null,
+  consecutiveFailures: 0,
+  uptime: 0,
+};
+
+// Extract hostname from Tigo URL
+function getTigoHostname() {
+  try {
+    const url = new URL(config.TIGO_BASE_URL);
+    return url.hostname;
+  } catch (error) {
+    console.error("Failed to extract hostname from TIGO_BASE_URL:", error.message);
+    return "sal-accessgwr1.tigo.co.tz";
+  }
+}
+
+async function checkTigoHealth() {
+  try {
+    const startTime = Date.now();
+    const tigoHost = getTigoHostname();
+
+    console.log(`[HEALTH] Pinging ${tigoHost}...`);
+
+    // Perform ICMP ping
+    const res = await ping.promise.probe(tigoHost, {
+      timeout: 5,
+      extra: ["-c", "1"], // Linux/Mac: 1 packet
+    });
+
+    const responseTime = Date.now() - startTime;
+    const isAlive = res.alive;
+
+    tigoHealthStatus = {
+      isHealthy: isAlive,
+      lastChecked: new Date().toISOString(),
+      lastError: isAlive ? null : "Host unreachable (ICMP timeout)",
+      consecutiveFailures: isAlive ? 0 : tigoHealthStatus.consecutiveFailures + 1,
+      responseTime,
+      host: tigoHost,
+      packetLoss: res.packetLoss || 0,
+      uptime: tigoHealthStatus.uptime,
+    };
+
+    if (isAlive) {
+      console.log(`[HEALTH] Tigo host ${tigoHost} is UP (${responseTime}ms, loss: ${res.packetLoss || 0}%)`);
+    } else {
+      console.warn(`[HEALTH] Tigo host ${tigoHost} is DOWN or unreachable`);
+    }
+  } catch (error) {
+    tigoHealthStatus = {
+      isHealthy: false,
+      lastChecked: new Date().toISOString(),
+      lastError: error.message,
+      consecutiveFailures: tigoHealthStatus.consecutiveFailures + 1,
+      uptime: tigoHealthStatus.uptime,
+    };
+    console.error(`[HEALTH] ICMP ping check failed: ${error.message}`);
+  }
+}
+
+// Health check configuration
+const HEALTH_CHECK_INTERVAL = parseInt(process.env.HEALTH_CHECK_INTERVAL || "60000", 10); // 60 seconds default
+const HEALTH_CHECK_ENABLED = process.env.HEALTH_CHECK_ENABLED !== "false"; // enabled by default
+
+// Start periodic health checks
+let healthCheckInterval = null;
+if (HEALTH_CHECK_ENABLED) {
+  console.log(`[HEALTH] Starting ICMP health checks every ${HEALTH_CHECK_INTERVAL}ms`);
+  
+  // Run first check immediately
+  checkTigoHealth();
+  
+  // Then run periodically
+  healthCheckInterval = setInterval(checkTigoHealth, HEALTH_CHECK_INTERVAL);
+}
 
 // ===== TOKEN CACHE =====
 let cachedToken = null;

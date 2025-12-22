@@ -57,10 +57,37 @@ TIGO_REQUEST_TIMEOUT=15000
 # Token caching
 TOKEN_EXPIRY_HOURS=24
 
+# Health check configuration
+HEALTH_CHECK_ENABLED=true
+HEALTH_CHECK_INTERVAL=60000  # milliseconds, default 60 seconds
+
 # Internal service to receive callbacks
 INTERNAL_SERVICE_URL=http://your-internal-service:5000
 INTERNAL_CALLBACK_ENDPOINT=/api/payment-callback
 INTERNAL_SERVICE_TIMEOUT=15000
+```
+
+### Health Check Configuration
+The service automatically performs **ICMP ping checks** to monitor Tigo API network availability. Health status is tracked internally and logged:
+
+**Configuration:**
+```bash
+HEALTH_CHECK_ENABLED=true          # Enable/disable automatic checks (default: true)
+HEALTH_CHECK_INTERVAL=60000        # Check frequency in milliseconds (default: 60 seconds)
+```
+
+**How It Works:**
+- Runs ICMP ping loop in background every 60 seconds
+- Extracts hostname from `TIGO_BASE_URL` and pings it
+- Tracks: response time, packet loss, consecutive failures, last check timestamp
+- Logs: `[HEALTH] Tigo host is UP/DOWN` messages to console
+- Does NOT expose HTTP endpoints — purely background monitoring
+
+**Example logs:**
+```
+[HEALTH] Starting ICMP health checks every 60000ms
+[HEALTH] Pinging sal-accessgwr1.tigo.co.tz...
+[HEALTH] Tigo host sal-accessgwr1.tigo.co.tz is UP (45ms, loss: 0%)
 ```
 
 ### Running Locally
