@@ -1,7 +1,8 @@
 const express = require("express");
 const axios = require("axios");
 const qs = require("qs");
-const ping = require("ping");
+const net = require("net");
+const dns = require("dns").promises;
 
 const https = require("https");
 
@@ -94,58 +95,81 @@ let tigoHealthStatus = {
   uptime: 0,
 };
 
-// Extract hostname from Tigo URL
-function getTigoHostname() {
+// Extract hostname and port from Tigo URL
+function getTigoHostInfo() {
   try {
     const url = new URL(config.TIGO_BASE_URL);
-    return url.hostname;
+    return {
+      hostname: url.hostname,
+      port: url.port || (url.protocol === "https:" ? 443 : 80),
+    };
   } catch (error) {
-    console.error("Failed to extract hostname from TIGO_BASE_URL:", error.message);
-    return "sal-accessgwr1.tigo.co.tz";
+    console.error("Failed to parse TIGO_BASE_URL:", error.message);
+    return { hostname: "sal-accessgwr1.tigo.co.tz", port: 443 };
   }
 }
 
 async function checkTigoHealth() {
+  const startTime = Date.now();
+  const { hostname, port } = getTigoHostInfo();
+
   try {
-    const startTime = Date.now();
-    const tigoHost = getTigoHostname();
+    console.log(`[HEALTH] Checking ${hostname}:${port}...`);
 
-    console.log(`[HEALTH] Pinging ${tigoHost}...`);
+    // First, resolve hostname to IP (DNS check)
+    const addresses = await dns.resolve4(hostname);
+    if (!addresses || addresses.length === 0) {
+      throw new Error("DNS resolution failed");
+    }
 
-    // Perform ICMP ping
-    const res = await ping.promise.probe(tigoHost, {
-      timeout: 5,
-      extra: ["-c", "1"], // Linux/Mac: 1 packet
+    // Then, attempt TCP connection to the port
+    await new Promise((resolve, reject) => {
+      const socket = net.createConnection({ host: hostname, port, timeout: 5000 });
+
+      socket.on("connect", () => {
+        socket.destroy();
+        resolve();
+      });
+
+      socket.on("timeout", () => {
+        socket.destroy();
+        reject(new Error("TCP connection timeout"));
+      });
+
+      socket.on("error", (err) => {
+        socket.destroy();
+        reject(err);
+      });
     });
 
     const responseTime = Date.now() - startTime;
-    const isAlive = res.alive;
 
     tigoHealthStatus = {
-      isHealthy: isAlive,
+      isHealthy: true,
       lastChecked: new Date().toISOString(),
-      lastError: isAlive ? null : "Host unreachable (ICMP timeout)",
-      consecutiveFailures: isAlive ? 0 : tigoHealthStatus.consecutiveFailures + 1,
+      lastError: null,
+      consecutiveFailures: 0,
       responseTime,
-      host: tigoHost,
-      packetLoss: res.packetLoss || 0,
+      host: hostname,
+      port,
       uptime: tigoHealthStatus.uptime,
     };
 
-    if (isAlive) {
-      console.log(`[HEALTH] Tigo host ${tigoHost} is UP (${responseTime}ms, loss: ${res.packetLoss || 0}%)`);
-    } else {
-      console.warn(`[HEALTH] Tigo host ${tigoHost} is DOWN or unreachable`);
-    }
+    console.log(`[HEALTH] Tigo host ${hostname}:${port} is UP (${responseTime}ms)`);
   } catch (error) {
+    const responseTime = Date.now() - startTime;
+
     tigoHealthStatus = {
       isHealthy: false,
       lastChecked: new Date().toISOString(),
       lastError: error.message,
       consecutiveFailures: tigoHealthStatus.consecutiveFailures + 1,
+      responseTime,
+      host: hostname,
+      port,
       uptime: tigoHealthStatus.uptime,
     };
-    console.error(`[HEALTH] ICMP ping check failed: ${error.message}`);
+    console.error(`[HEALTH] Tigo host check failed: ${error.message}`);
   }
 }
 
@@ -156,7 +180,7 @@ const HEALTH_CHECK_ENABLED = process.env.HEALTH_CHECK_ENABLED !== "false"; // en
 // Start periodic health checks
 let healthCheckInterval = null;
 if (HEALTH_CHECK_ENABLED) {
-  console.log(`[HEALTH] Starting ICMP health checks every ${HEALTH_CHECK_INTERVAL}ms`);
+  console.log(`[HEALTH] Starting health checks every ${HEALTH_CHECK_INTERVAL}ms`);
   
   // Run first check immediately
   checkTigoHealth();

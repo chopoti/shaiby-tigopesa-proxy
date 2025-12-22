@@ -68,7 +68,15 @@ INTERNAL_SERVICE_TIMEOUT=15000
 ```
 
 ### Health Check Configuration
-The service automatically performs **ICMP ping checks** to monitor Tigo API network availability. Health status is tracked internally and logged:
+The service automatically performs **health checks** to monitor Tigo API availability using DNS resolution + TCP connection tests. Health status is tracked internally and logged:
+
+**How It Works:**
+- Extracts hostname and port from `TIGO_BASE_URL`
+- Performs DNS resolution to verify the host is reachable
+- Attempts TCP connection to the port (typically 443 for HTTPS)
+- Runs every 60 seconds by default, logs results to stdout
+- Tracks: response time, consecutive failures, last check timestamp
+- Does NOT expose HTTP endpoints — purely background monitoring
 
 **Configuration:**
 ```bash
@@ -76,18 +84,11 @@ HEALTH_CHECK_ENABLED=true          # Enable/disable automatic checks (default: t
 HEALTH_CHECK_INTERVAL=60000        # Check frequency in milliseconds (default: 60 seconds)
 ```
 
-**How It Works:**
-- Runs ICMP ping loop in background every 60 seconds
-- Extracts hostname from `TIGO_BASE_URL` and pings it
-- Tracks: response time, packet loss, consecutive failures, last check timestamp
-- Logs: `[HEALTH] Tigo host is UP/DOWN` messages to console
-- Does NOT expose HTTP endpoints — purely background monitoring
-
 **Example logs:**
 ```
-[HEALTH] Starting ICMP health checks every 60000ms
-[HEALTH] Pinging sal-accessgwr1.tigo.co.tz...
-[HEALTH] Tigo host sal-accessgwr1.tigo.co.tz is UP (45ms, loss: 0%)
+[HEALTH] Starting health checks every 60000ms
+[HEALTH] Checking sal-accessgwr1.tigo.co.tz:443...
+[HEALTH] Tigo host sal-accessgwr1.tigo.co.tz:443 is UP (245ms)
 ```
 
 ### Running Locally
