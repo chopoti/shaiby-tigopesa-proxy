@@ -39,10 +39,35 @@ This is a Node.js/Express proxy service that relays bill payment requests to the
 
 ## Development Workflow
 
+### Environment Variables
+All configuration is managed through environment variables. Copy `.env.example` to `.env` and customize:
+
+```bash
+# Server settings
+SERVER_PORT=3000
+SERVER_HOST=0.0.0.0
+NODE_ENV=production
+
+# Tigo API (can be overridden for staging/testing)
+TIGO_BASE_URL=https://sal-accessgwr1.tigo.co.tz:8443
+TIGO_USERNAME=ShabibyTransporterLtd
+TIGO_PASSWORD=saRBJCe
+TIGO_REQUEST_TIMEOUT=15000
+
+# Token caching
+TOKEN_EXPIRY_HOURS=24
+
+# Internal service to receive callbacks
+INTERNAL_SERVICE_URL=http://your-internal-service:5000
+INTERNAL_CALLBACK_ENDPOINT=/api/payment-callback
+INTERNAL_SERVICE_TIMEOUT=15000
+```
+
 ### Running Locally
 ```bash
 npm install
-npm start  # Starts on 0.0.0.0:3000
+# Configure .env (optional - uses defaults from .env.example)
+npm start  # Starts on configured SERVER_HOST:SERVER_PORT
 ```
 
 ### Testing
