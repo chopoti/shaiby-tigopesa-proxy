@@ -36,7 +36,6 @@ const config = {
   INTERNAL_CALLBACK_ENDPOINT: process.env.INTERNAL_CALLBACK_ENDPOINT || "/api/payment-callback",
   INTERNAL_SERVICE_TIMEOUT: parseInt(process.env.INTERNAL_SERVICE_TIMEOUT || "15000", 10),
 
-  // Logging Config
   LOG_LEVEL: process.env.LOG_LEVEL || "info",
 };
 
@@ -192,70 +191,71 @@ if (HEALTH_CHECK_ENABLED) {
 // ===== TOKEN CACHE =====
 let cachedToken = null;
 let tokenExpiryTime = null;
-
-function isTokenValid() {
-  if (!cachedToken || !tokenExpiryTime) {
-    return false;
-  }
-  const now = Date.now();
-  const isValid = now < tokenExpiryTime;
-  if (!isValid) {
-    console.log(
-      "Token expired. Current time:",
-      new Date(now).toISOString(),
-      "Expiry time:",
-      new Date(tokenExpiryTime).toISOString()
-    );
-    cachedToken = null;
-    tokenExpiryTime = null;
-  }
-  return isValid;
-}
+let tokenRefreshInterval = null;
 
 // ===== TOKEN REQUEST =====
 async function getAccessToken() {
-  // Return cached token if still valid
-  if (isTokenValid()) {
+  // Always request a new token (no caching, refresh every 1 hour)
+  console.log("Requesting new token from Tigo...");
+  try {
+    const response = await axios.post(
+      `${config.TIGO_BASE_URL}${config.TIGO_TOKEN_ENDPOINT}`,
+      qs.stringify({
+        username: config.TIGO_USERNAME,
+        password: config.TIGO_PASSWORD,
+        grant_type: "password",
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Cache-Control": "no-cache",
+        },
+        timeout: config.TIGO_REQUEST_TIMEOUT,
+        httpsAgent,
+      }
+    );
+
+    console.log("Token Response :", {
+      status: response?.status,
+      data: response?.data,
+    });
+
+    // Cache the token
+    cachedToken = response.data.access_token;
+    tokenExpiryTime = Date.now() + config.TOKEN_EXPIRY_MS;
     console.log(
-      "Using cached token. Expires at:",
+      "Token cached. Expires at:",
       new Date(tokenExpiryTime).toISOString()
     );
+
     return cachedToken;
+  } catch (error) {
+    console.error("Failed to get access token:", error.message);
+    throw error;
   }
-
-  console.log("Requesting new token from Tigo...");
-  const response = await axios.post(
-    `${config.TIGO_BASE_URL}${config.TIGO_TOKEN_ENDPOINT}`,
-    qs.stringify({
-      username: config.TIGO_USERNAME,
-      password: config.TIGO_PASSWORD,
-      grant_type: "password",
-    }),
-    {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Cache-Control": "no-cache",
-      },
-      timeout: config.TIGO_REQUEST_TIMEOUT,
-      httpsAgent,
-    }
-  );
-
-  console.log("Token Response :", {
-    status: response?.status,
-    data: response?.data,
-  });
-
-  // Cache the token
-  cachedToken = response.data.access_token;
-  tokenExpiryTime = Date.now() + config.TOKEN_EXPIRY_MS;
-  console.log(
-    "Token cached. Expires at:",
-    new Date(tokenExpiryTime).toISOString()
-  );
-
-  return cachedToken;
 }
+
+// ===== AUTOMATIC TOKEN REFRESH EVERY 1 HOUR =====
+async function refreshToken() {
+  try {
+    console.log("[TOKEN] Refreshing token (scheduled refresh)...");
+    await getAccessToken();
+  } catch (error) {
+    console.error("[TOKEN] Scheduled token refresh failed:", error.message);
+  }
+}
+
+// Start automatic token refresh timer (every 1 hour)
+const TOKEN_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour
+console.log(`[TOKEN] Starting automatic token refresh every ${TOKEN_REFRESH_INTERVAL / 1000 / 60} minutes`);
+
+// Request token immediately on startup
+getAccessToken().catch((error) => {
+  console.error("[TOKEN] Initial token request failed:", error.message);
+});
+
+// Then refresh every 1 hour
+tokenRefreshInterval = setInterval(refreshToken, TOKEN_REFRESH_INTERVAL);
 
 // ===== RELAY ENDPOINT =====
 app.post("/relay/push-billpay", async (req, res) => {

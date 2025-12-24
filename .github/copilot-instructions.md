@@ -23,8 +23,11 @@ This is a Node.js/Express proxy service that relays bill payment requests to the
 - Must be preserved in all code paths making HTTPS calls
 
 ### Authentication Approach
-- Credentials stored as constants (`USERNAME`, `PASSWORD`) for token generation
-- Token is requested fresh per `/relay/push-billpay` call (no caching) - keep this pattern
+- Credentials stored as environment variables (`TIGO_USERNAME`, `TIGO_PASSWORD`)
+- Token is requested on startup and automatically refreshed **every 1 hour**
+- Cached token is used for all requests within the 1-hour window
+- Service requests a fresh token immediately after startup, then every 60 minutes
+- No manual restart needed — automatic refresh runs in background
 - Tigo returns `access_token` in `response.data.access_token`
 
 ### Error Handling Strategy
